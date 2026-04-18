@@ -90,6 +90,9 @@ st.markdown("""
         margin-bottom: 1rem;
         transition: transform 0.2s, box-shadow 0.2s;
         cursor: pointer;
+        min-height: 290px;
+        display: flex;
+        flex-direction: column;
     }
     .cipher-card:hover {
         transform: translateY(-3px);
@@ -97,6 +100,16 @@ st.markdown("""
     }
     .cipher-card h3 { margin: 0.5rem 0 0.3rem; font-size: 1.15rem; }
     .cipher-card p  { margin: 0; font-size: 0.88rem; color: #8b949e; line-height: 1.5; }
+    .cipher-card-desc {
+        flex: 1;
+        min-height: 110px;
+    }
+    .cipher-card-features {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: auto;
+    }
     .badge {
         display: inline-block;
         padding: 2px 10px;
@@ -130,7 +143,7 @@ st.markdown("""
         CryptoVault
     </h1>
     <p style="margin:0.6rem 0 0; color:#8b949e; font-size:1.05rem; max-width:520px; margin-left:auto; margin-right:auto;">
-        A professional encryption suite supporting five cipher techniques —
+        A professional encryption suite supporting six cipher techniques —
         from classical to modern asymmetric cryptography.
     </p>
 </div>
@@ -139,7 +152,7 @@ st.markdown("""
 
 # ──────────────────────── Metrics Row ────────────────────────
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Cipher Techniques", "5", help="Caesar, XOR, AES-256, RSA, Monoalphabetic")
+m1.metric("Cipher Techniques", "6", help="Caesar, XOR, AES-256, RSA, Monoalphabetic, Playfair")
 m2.metric("AES Key Size", "256-bit", help="Industry-standard symmetric encryption")
 m3.metric("RSA Key Size", "2048-bit", help="Secure asymmetric encryption")
 m4.metric("File Support", "✅", help="Upload & download .txt files on every page")
@@ -213,6 +226,19 @@ CARDS = [
         "features": ["Custom letter mapping", "Duplicate prevention", "Interactive table"],
         "page": "pages/5_Monoalphabetic_Cipher.py",
     },
+    {
+        "icon": "🗝️",
+        "name": "Playfair Cipher",
+        "badge": "classic",
+        "badge_label": "Classical",
+        "desc": (
+            "A digraph substitution cipher that encrypts pairs of letters using a 5x5 "
+            "keyword matrix. It merges I/J, inserts filler letters when needed, and applies "
+            "row, column, and rectangle rules."
+        ),
+        "features": ["Keyword matrix", "Digraph-based", "I/J merged"],
+        "page": "pages/6_Playfair_Cipher.py",
+    },
 ]
 
 badge_colors = {
@@ -253,8 +279,8 @@ for idx, card in enumerate(CARDS):
                 </div>
             </div>
             <h3 style="color:#e6edf3;margin:0 0 0.4rem;">{card['name']}</h3>
-            <p style="color:#8b949e;font-size:0.88rem;line-height:1.5;margin-bottom:0.8rem;">{card['desc']}</p>
-            <div style="display:flex;flex-wrap:wrap;gap:4px;">{features_html}</div>
+            <p class="cipher-card-desc" style="color:#8b949e;font-size:0.88rem;line-height:1.5;margin-bottom:0.8rem;">{card['desc']}</p>
+            <div class="cipher-card-features">{features_html}</div>
         </div>
         """, unsafe_allow_html=True)
         st.page_link(card["page"], label=f"Open {card['name']} →", use_container_width=True)
@@ -265,6 +291,6 @@ for idx, card in enumerate(CARDS):
 st.divider()
 st.markdown("""
 <p style="text-align:center;color:#484f58;font-size:0.82rem;">
-    CryptoVault • Built with Streamlit • AES-256 · RSA-2048 · Caesar · XOR · Monoalphabetic
+    CryptoVault • Built with Streamlit • AES-256 · RSA-2048 · Caesar · XOR · Monoalphabetic · Playfair
 </p>
 """, unsafe_allow_html=True)

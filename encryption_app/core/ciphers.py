@@ -2,7 +2,7 @@
 core/ciphers.py
 ---------------
 All encryption/decryption logic.
-Supports: Caesar, XOR, AES-256, RSA, Monoalphabetic Cipher.
+Supports: Caesar, XOR, AES-256, RSA, Monoalphabetic Cipher, Playfair Cipher.
 """
 
 import base64
@@ -257,6 +257,7 @@ def rsa_decrypt(ciphertext: str, private_key_pem: str) -> str:
 # ─────────────────────────────────────────────
 
 ALPHABET = string.ascii_uppercase
+PLAYFAIR_ALPHABET = "ABCDEFGHIKLMNOPQRSTUVWXYZ"
 
 
 def validate_mono_mapping(mapping: dict[str, str]) -> None:
@@ -320,3 +321,211 @@ def mono_decrypt(text: str, mapping: dict[str, str]) -> str:
         else:
             result.append(char)
     return ''.join(result)
+
+
+# ---------------------------------------------------------------------
+#  PLAYFAIR CIPHER
+# ---------------------------------------------------------------------
+
+def _validate_playfair_key(key: str) -> str:
+    """Validate and normalize a Playfair keyword."""
+    if not key or not key.strip():
+        raise ValueError("Playfair key cannot be empty.")
+
+    normalized = ''.join(key.upper().split())
+    if not normalized.isalpha():
+        raise ValueError("Playfair key must contain only alphabet letters.")
+
+    return normalized.replace('J', 'I')
+
+
+def _normalize_playfair_text(text: str, *, field_name: str) -> str:
+    """Normalize Playfair input text by uppercasing and removing spaces."""
+    if not text or not text.strip():
+        raise ValueError(f"{field_name} cannot be empty.")
+
+    if any(not (char.isalpha() or char.isspace()) for char in text):
+        raise ValueError(f"{field_name} must contain only alphabet letters and spaces.")
+
+    normalized = ''.join(text.upper().split())
+    if not normalized:
+        raise ValueError(f"{field_name} cannot be empty.")
+
+    return normalized.replace('J', 'I')
+
+
+def _apply_playfair_formatting(template_text: str, transformed_text: str) -> str:
+    """
+    Reapply the original spacing and letter case pattern to transformed text.
+
+    Extra letters introduced by Playfair filler handling are appended using the
+    last seen alphabetic case style from the template.
+    """
+    formatted = []
+    text_index = 0
+    last_alpha_was_upper = True
+
+    for char in template_text:
+        if char.isalpha():
+            if text_index >= len(transformed_text):
+                break
+            mapped = transformed_text[text_index]
+            formatted.append(mapped if char.isupper() else mapped.lower())
+            last_alpha_was_upper = char.isupper()
+            text_index += 1
+        elif char.isspace():
+            formatted.append(char)
+
+    while text_index < len(transformed_text):
+        mapped = transformed_text[text_index]
+        formatted.append(mapped if last_alpha_was_upper else mapped.lower())
+        text_index += 1
+
+    return ''.join(formatted)
+
+
+def generate_playfair_matrix(key: str) -> tuple[list[list[str]], dict[str, tuple[int, int]]]:
+    """
+    Generate the 5x5 Playfair matrix and a letter-position lookup.
+    I/J are merged into a single cell.
+    """
+    normalized_key = _validate_playfair_key(key)
+
+    seen = set()
+    sequence = []
+
+    for char in normalized_key + PLAYFAIR_ALPHABET:
+        if char not in seen:
+            seen.add(char)
+            sequence.append(char)
+
+    matrix = [sequence[index:index + 5] for index in range(0, 25, 5)]
+    positions = {
+        char: (row_index, col_index)
+        for row_index, row in enumerate(matrix)
+        for col_index, char in enumerate(row)
+    }
+    positions['J'] = positions['I']
+    return matrix, positions
+
+
+def _prepare_playfair_plaintext(text: str) -> list[str]:
+    """Prepare plaintext as Playfair digraphs."""
+    normalized = _normalize_playfair_text(text, field_name="Input text")
+    digraphs = []
+    index = 0
+
+    while index < len(normalized):
+        first = normalized[index]
+        if index + 1 >= len(normalized):
+            second = 'X'
+            index += 1
+        else:
+            second = normalized[index + 1]
+            if first == second:
+                second = 'X'
+                index += 1
+            else:
+                index += 2
+        digraphs.append(first + second)
+
+    if digraphs and len(digraphs[-1]) == 1:
+        digraphs[-1] += 'X'
+
+    return digraphs
+
+
+def _prepare_playfair_ciphertext(text: str) -> list[str]:
+    """Prepare ciphertext digraphs for Playfair decryption."""
+    normalized = _normalize_playfair_text(text, field_name="Input text")
+    if len(normalized) % 2 != 0:
+        raise ValueError("Playfair ciphertext must contain an even number of letters.")
+    return [normalized[index:index + 2] for index in range(0, len(normalized), 2)]
+
+
+def _cleanup_playfair_plaintext(text: str) -> str:
+    """
+    Remove common filler X values added during Playfair encryption.
+
+    This uses the standard heuristic:
+    - Remove X when it appears between two identical letters, e.g. LXL -> LL
+    - Remove a trailing X that was likely added for odd-length plaintext
+    """
+    cleaned = []
+    index = 0
+
+    while index < len(text):
+        if (
+            index + 2 < len(text)
+            and text[index] == text[index + 2]
+            and text[index + 1] == 'X'
+        ):
+            cleaned.append(text[index])
+            cleaned.append(text[index + 2])
+            index += 3
+        else:
+            cleaned.append(text[index])
+            index += 1
+
+    if cleaned and cleaned[-1] == 'X':
+        cleaned.pop()
+
+    return ''.join(cleaned)
+
+
+def _transform_playfair_pair(
+    pair: str,
+    positions: dict[str, tuple[int, int]],
+    matrix: list[list[str]],
+    *,
+    mode: str
+) -> str:
+    """Encrypt or decrypt a single Playfair digraph."""
+    first, second = pair
+    row1, col1 = positions[first]
+    row2, col2 = positions[second]
+
+    if row1 == row2:
+        shift = 1 if mode == "encrypt" else -1
+        return matrix[row1][(col1 + shift) % 5] + matrix[row2][(col2 + shift) % 5]
+
+    if col1 == col2:
+        shift = 1 if mode == "encrypt" else -1
+        return matrix[(row1 + shift) % 5][col1] + matrix[(row2 + shift) % 5][col2]
+
+    return matrix[row1][col2] + matrix[row2][col1]
+
+
+def playfair_encrypt(text: str, key: str) -> str:
+    """
+    Encrypt text using the Playfair cipher.
+    Rules:
+    - Same row: shift right
+    - Same column: shift down
+    - Rectangle: swap columns
+    """
+    matrix, positions = generate_playfair_matrix(key)
+    digraphs = _prepare_playfair_plaintext(text)
+    encrypted = ''.join(
+        _transform_playfair_pair(pair, positions, matrix, mode="encrypt")
+        for pair in digraphs
+    )
+    return _apply_playfair_formatting(text, encrypted)
+
+
+def playfair_decrypt(text: str, key: str) -> str:
+    """
+    Decrypt Playfair ciphertext.
+    Reverse rules:
+    - Same row: shift left
+    - Same column: shift up
+    - Rectangle: swap columns
+    """
+    matrix, positions = generate_playfair_matrix(key)
+    digraphs = _prepare_playfair_ciphertext(text)
+    decrypted = ''.join(
+        _transform_playfair_pair(pair, positions, matrix, mode="decrypt")
+        for pair in digraphs
+    )
+    cleaned = _cleanup_playfair_plaintext(decrypted)
+    return _apply_playfair_formatting(text, cleaned)
