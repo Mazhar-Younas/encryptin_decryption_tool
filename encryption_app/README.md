@@ -1,7 +1,7 @@
 # 🔐 CryptoVault — Encryption Suite
 
-A professional **Streamlit** web app supporting five cipher techniques:
-Caesar, XOR, AES-256, RSA-2048, and a custom Monoalphabetic cipher.
+A professional **Streamlit** web app supporting six cipher techniques:
+Caesar, XOR, AES-256, RSA-2048, Monoalphabetic, and Playfair ciphers.
 
 ---
 
@@ -22,7 +22,8 @@ encryption_app/
     ├── 2_XOR_Cipher.py
     ├── 3_AES_Encryption.py
     ├── 4_RSA_Encryption.py
-    └── 5_Monoalphabetic_Cipher.py
+    ├── 5_Monoalphabetic_Cipher.py
+    └── 6_Playfair_Cipher.py
 ```
 
 ---
@@ -62,6 +63,26 @@ The app opens at **http://localhost:8501** in your browser.
 | AES-256 | 32-byte Base64 | Symmetric CBC | Auto key generation; PKCS7 padding |
 | RSA | 2048-bit PEM key pair | Asymmetric | OAEP+SHA-256; chunked for long text |
 | Monoalphabetic | Custom letter mapping | Symmetric | Interactive builder; import/export JSON |
+| Playfair | Alphabet keyword | Symmetric digraphs | 5x5 matrix, I/J merged, X padding |
+
+---
+
+## 🗝️ Playfair Technique
+
+The Playfair cipher encrypts text two letters at a time using a 5x5 keyword matrix.
+
+- Build the matrix from a keyword, then fill remaining letters alphabetically.
+- Merge `I` and `J` into a single cell.
+- Convert input text to uppercase, remove spaces, and replace `J` with `I`.
+- Split text into letter pairs.
+- Insert `X` between repeated letters in a pair.
+- Add a trailing `X` when plaintext has odd length.
+- Encryption rules:
+  - Same row → shift each letter one cell to the right.
+  - Same column → shift each letter one cell down.
+  - Rectangle → swap the columns of the paired letters.
+
+This app supports both Playfair encryption and decryption with automatic matrix generation from your keyword.
 
 ---
 
@@ -83,6 +104,7 @@ The app opens at **http://localhost:8501** in your browser.
 - ✅ Monoalphabetic interactive mapping with duplicate prevention
 - ✅ Import/export mapping as JSON
 - ✅ Random full-alphabet derangement for monoalphabetic
+- ✅ Playfair keyword matrix builder with digraph encryption/decryption
 - ✅ Caesar brute-force panel (all 25 shifts)
 - ✅ XOR character-level demo
 - ✅ Live preview on monoalphabetic page
